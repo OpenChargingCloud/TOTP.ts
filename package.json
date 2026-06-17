@@ -1,0 +1,43 @@
+{
+  "name": "@open-charging-cloud/totp",
+  "version": "0.1.0",
+  "description": "Time-based one-time password generator for Open Charging Cloud applications.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && vitest run",
+    "prepack": "npm run test"
+  },
+  "keywords": [
+    "totp",
+    "otp",
+    "time-based-one-time-password",
+    "open-charging-cloud"
+  ],
+  "author": "GraphDefined GmbH <achim.friedland@graphdefined.com>",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.0",
+    "vitest": "^4.1.9"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
