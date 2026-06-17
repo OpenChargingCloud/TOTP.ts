@@ -2,6 +2,8 @@
 
 TOTP is a TypeScript library for creating Time-based One-Time Passwords (TOTPs).
 
+https://www.npmjs.com/package/@open-charging-cloud/totp
+
 It can be used e.g. for Secure Dynamic QR-Codes in E-Mobility or a secure alternative for legacy HTTP BASIC Authentication mechanisms using `Authorization: TOTP <token> <totp>`.
 
 ## Installation
