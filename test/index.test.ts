@@ -28,6 +28,10 @@ describe("Validations", () => {
     expect(() => generateTOTPs("secure!Charging!", 30, 12, "ab cdef")).toThrow("The given alphabet must not contain any whitespace characters!");
   });
 
+  it("throws an error for invalid hash algorithm", () => {
+    expect(() => generateTOTPs("secure!Charging!", 30, 12, null, null, "sha1" as never)).toThrow("The hash algorithm must be one of: sha256, sha384, sha512!");
+  });
+
 });
 
 
@@ -78,6 +82,24 @@ describe("Generate TOTPs", () => {
     });
   });
 
+  it("generates TOTP codes with SHA-384 correctly", () => {
+    expect(generateTOTPs("secure!Charging!", null, null, null, Date.UTC(2024, 4, 23, 0, 23, 5), "sha384")).toEqual({
+      previous:       "0SbZV69lSa4W",
+      current:        "jAzmwLzuPuUb",
+      next:           "mqtkOMRrX1aS",
+      remainingTime:   25
+    });
+  });
+
+  it("generates TOTP codes with SHA-512 correctly", () => {
+    expect(generateTOTPs("secure!Charging!", null, null, null, Date.UTC(2024, 4, 23, 0, 23, 5), "sha512")).toEqual({
+      previous:       "wjmTW4LVTdwv",
+      current:        "yBhTTbXO2ILd",
+      next:           "MHMqTXE1oVf9",
+      remainingTime:   25
+    });
+  });
+
 });
 
 
@@ -90,7 +112,8 @@ describe("Object API", () => {
         validityTime:   30,
         totpLength:     6,
         alphabet:      "0123456789",
-        timestamp:      new Date(1718611200000)
+        timestamp:      new Date(1718611200000),
+        hashAlgorithm: "sha256"
       }).current
     ).toBe("441749");
   });

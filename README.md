@@ -29,13 +29,14 @@ const totps = generateTOTPs({
   validityTime:   30,
   totpLength:     12,
   alphabet:      "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
-  timestamp:      Date.now()
+  timestamp:      Date.now(),
+  hashAlgorithm: "sha256"
 });
 ```
 
 ## API
 
-### `generateTOTPs(sharedSecret, validityTime, totpLength, alphabet, timestamp)`
+### `generateTOTPs(sharedSecret, validityTime, totpLength, alphabet, timestamp, hashAlgorithm)`
 
 Generates TOTP values for the previous, current, and next time slot.
 
@@ -48,6 +49,7 @@ Parameters:
 | `totpLength` | Generated token length. | `12` |
 | `alphabet` | Alphabet used for token characters. | Digits, lowercase letters, and uppercase letters |
 | `timestamp` | Unix timestamp in milliseconds or `Date`. | `Date.now()` |
+| `hashAlgorithm` | HMAC hash algorithm. Must be `sha256`, `sha384`, or `sha512`. | `sha256` |
 
 Returns:
 

@@ -20,13 +20,17 @@ import crypto from "node:crypto";
 const DEFAULT_VALIDITY_TIME  = 30;
 const DEFAULT_TOTP_LENGTH    = 12;
 const DEFAULT_ALPHABET       = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const DEFAULT_HASH_ALGORITHM = "sha256";
+
+export type TOTPHashAlgorithm = "sha256" | "sha384" | "sha512";
 
 export interface GenerateTOTPOptions {
-    sharedSecret:   string;
-    validityTime?:  number | null;
-    totpLength?:    number | null;
-    alphabet?:      string | null;
-    timestamp?:     Date   | number | null;
+    sharedSecret:    string;
+    validityTime?:   number | null;
+    totpLength?:     number | null;
+    alphabet?:       string | null;
+    timestamp?:      Date   | number | null;
+    hashAlgorithm?:  TOTPHashAlgorithm | null;
 }
 
 export interface TOTPResult {
@@ -36,9 +40,13 @@ export interface TOTPResult {
     remainingTime:  number;
 }
 
-function calcTOTPSlot(slotBytes: Buffer, totpLength: number, alphabet: string, sharedSecret: string): string {
+function calcTOTPSlot(slotBytes:      Buffer,
+                      totpLength:     number,
+                      alphabet:       string,
+                      sharedSecret:   string,
+                      hashAlgorithm:  TOTPHashAlgorithm): string {
 
-    const hmac = crypto.createHmac("sha256", Buffer.from(sharedSecret, "utf-8"));
+    const hmac = crypto.createHmac(hashAlgorithm, Buffer.from(sharedSecret, "utf-8"));
     const currentHash = hmac.update(slotBytes).digest();
     const offset = currentHash[currentHash.length - 1] & 0x0F;
 
@@ -68,13 +76,15 @@ export function generateTOTPs(sharedSecret:           string,
                               validityTime?:          number | null,
                               totpLength?:            number | null,
                               alphabet?:              string | null,
-                              timestamp?:             Date   | number | null): TOTPResult;
+                              timestamp?:             Date   | number | null,
+                              hashAlgorithm?:         TOTPHashAlgorithm | null): TOTPResult;
 
 export function generateTOTPs(sharedSecretOrOptions:  string | GenerateTOTPOptions,
                               validityTime:           number | null = null,
                               totpLength:             number | null = null,
                               alphabet:               string | null = null,
-                              timestamp:              Date   | number | null = null): TOTPResult {
+                              timestamp:              Date   | number | null = null,
+                              hashAlgorithm:          TOTPHashAlgorithm | null = null): TOTPResult {
 
     const options                 = typeof sharedSecretOrOptions === "string"
                                         ? {
@@ -82,13 +92,15 @@ export function generateTOTPs(sharedSecretOrOptions:  string | GenerateTOTPOptio
                                               validityTime,
                                               totpLength,
                                               alphabet,
-                                              timestamp
+                                              timestamp,
+                                              hashAlgorithm
                                           }
                                         : sharedSecretOrOptions;
 
     const normalizedValidityTime  =  options.validityTime ?? DEFAULT_VALIDITY_TIME;
     const normalizedTOTPLength    =  options.totpLength   ?? DEFAULT_TOTP_LENGTH;
     const normalizedTimestamp     =  normalizeTimestamp(options.timestamp);
+    const normalizedHashAlgorithm =  options.hashAlgorithm ?? DEFAULT_HASH_ALGORITHM;
 
     const sharedSecret            =  options.sharedSecret?.trim();
     const normalizedAlphabet      = (options.alphabet     ?? DEFAULT_ALPHABET).trim();
@@ -110,6 +122,9 @@ export function generateTOTPs(sharedSecretOrOptions:  string | GenerateTOTPOptio
 
     if (!Number.isFinite(normalizedTimestamp) || normalizedTimestamp < 0)
         throw new Error("The timestamp must be a non-negative Unix timestamp in milliseconds!");
+
+    if (!["sha256", "sha384", "sha512"].includes(normalizedHashAlgorithm))
+        throw new Error("The hash algorithm must be one of: sha256, sha384, sha512!");
 
     if (!normalizedAlphabet)
         throw new Error("The given alphabet must not be null or empty!");
@@ -136,11 +151,10 @@ export function generateTOTPs(sharedSecretOrOptions:  string | GenerateTOTPOptio
     nextSlotBytes.    writeBigUInt64BE(currentSlot + BigInt(1));
 
     return {
-        previous:  calcTOTPSlot(previousSlotBytes, normalizedTOTPLength, normalizedAlphabet, sharedSecret),
-        current:   calcTOTPSlot(currentSlotBytes,  normalizedTOTPLength, normalizedAlphabet, sharedSecret),
-        next:      calcTOTPSlot(nextSlotBytes,     normalizedTOTPLength, normalizedAlphabet, sharedSecret),
+        previous:  calcTOTPSlot(previousSlotBytes, normalizedTOTPLength, normalizedAlphabet, sharedSecret, normalizedHashAlgorithm),
+        current:   calcTOTPSlot(currentSlotBytes,  normalizedTOTPLength, normalizedAlphabet, sharedSecret, normalizedHashAlgorithm),
+        next:      calcTOTPSlot(nextSlotBytes,     normalizedTOTPLength, normalizedAlphabet, sharedSecret, normalizedHashAlgorithm),
         remainingTime
     };
 
 }
-
