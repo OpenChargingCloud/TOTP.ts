@@ -2,7 +2,16 @@
   "name": "@open-charging-cloud/totp",
   "version": "0.2.0",
   "description": "Time-based one-time password generator for Open Charging Cloud applications.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OpenChargingCloud/TOTP.ts.git"
+  },
+  "bugs": {
+    "url": "https://github.com/OpenChargingCloud/TOTP.ts/issues"
+  },
+  "homepage": "https://github.com/OpenChargingCloud/TOTP.ts#readme",
   "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

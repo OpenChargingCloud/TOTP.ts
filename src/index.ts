@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2024-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
- * This file is part of DynamicQRCodes <https://github.com/OpenChargingCloud/DynamicQRCodes>
+ * This file is part of TOTP.ts <https://github.com/OpenChargingCloud/TOTP.ts>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.

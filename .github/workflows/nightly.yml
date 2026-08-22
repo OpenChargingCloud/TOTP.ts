@@ -1,0 +1,127 @@
+name: Nightly
+
+# The counterpart to ci.yml. That workflow gates every push against the pinned
+# package-lock.json — which means a day on which nobody pushes is a day on
+# which nobody notices that the ecosystem moved underneath us. This one
+# notices: it re-resolves the dependency ranges, runs the suite on the newest
+# Node, and audits the tree.
+#
+# What it deliberately does NOT do is repeat ci.yml's 2×3 matrix. Hermod's
+# nightly re-runs its gate to catch tests that only fail sometimes; this suite
+# is fully deterministic (every vector runs against a fixed timestamp, nothing
+# consults the wall clock), so a nightly repetition of the pinned matrix could
+# only ever reproduce the previous run.
+#
+# Two things worth knowing about scheduled workflows: they only ever run on
+# the default branch, and GitHub disables them after 60 days without any
+# repository activity. If this stops reporting, that is the first thing to
+# check — for a small, essentially finished library, it WILL happen.
+on:
+  schedule:
+    # 02:43 UTC. Not on the hour: GitHub's scheduler is busiest then and
+    # delays runs by tens of minutes.
+    - cron: '43 2 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # The gate, but against freshly resolved dependencies: the lock file is
+  # removed before install, so every ^-range in package.json resolves to its
+  # newest satisfying version. A red here without a corresponding red in CI
+  # means a dependency moved underneath us — typically a new TypeScript or
+  # vitest minor. That turns the night red without anything in this
+  # repository having changed; like Hermod building against Styx master, that
+  # is the honest signal, and a choice, not an accident. Fatal on purpose.
+  fresh-dependencies:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.x'
+
+      - name: Install freshest in-range dependencies
+        shell: bash
+        run: |
+          rm package-lock.json
+          npm install --no-audit --no-fund
+          npm ls --depth=0 || true
+
+      - name: Build and test
+        run: npm test
+
+  # The pinned suite on whatever Node currently calls itself "latest" — early
+  # warning for the next major, months before it becomes an LTS leg in
+  # ci.yml's matrix. Fatal: when the compiled output or the toolchain breaks
+  # on the next Node, that is a real finding, not runner weather.
+  node-latest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: latest
+          cache: npm
+
+      - name: Install dependencies
+        run: node --version && npm ci
+
+      - name: Build and test
+        run: npm test
+
+  # Informational on purpose: advisories appear on the registry's schedule,
+  # not ours, and every dependency here is a devDependency — the published
+  # package has zero runtime dependencies, so an advisory in vitest does not
+  # make the shipped library vulnerable. Read the summary for a trend; it
+  # must not be able to turn the night red.
+  #
+  # The pack listing guards the "files" allow-list in package.json: what npm
+  # would publish is written into the step summary, so a missing dist/ or an
+  # accidentally included file is visible at a glance. --ignore-scripts keeps
+  # prepack (which would re-run the whole suite) out of it — the suite
+  # already ran twice above; this step is only about the tarball contents.
+  audit-and-pack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.x'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: npm audit (informational)
+        continue-on-error: true
+        run: |
+          {
+            echo '## npm audit (informational)'
+            echo
+            echo 'All dependencies are devDependencies; the published package has none.'
+            echo
+            echo '```'
+            npm audit || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Package contents
+        run: |
+          npm run build
+          {
+            echo '## npm pack --dry-run'
+            echo
+            echo '```'
+            npm pack --dry-run --ignore-scripts 2>&1
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

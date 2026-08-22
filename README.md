@@ -1,5 +1,9 @@
 # @open-charging-cloud/totp
 
+[![CI](https://github.com/OpenChargingCloud/TOTP.ts/actions/workflows/ci.yml/badge.svg)](https://github.com/OpenChargingCloud/TOTP.ts/actions/workflows/ci.yml)
+[![Nightly](https://github.com/OpenChargingCloud/TOTP.ts/actions/workflows/nightly.yml/badge.svg)](https://github.com/OpenChargingCloud/TOTP.ts/actions/workflows/nightly.yml)
+[![npm](https://img.shields.io/npm/v/%40open-charging-cloud%2Ftotp)](https://www.npmjs.com/package/@open-charging-cloud/totp)
+
 TOTP is a TypeScript library for creating Time-based One-Time Passwords (TOTPs).
 
 https://www.npmjs.com/package/@open-charging-cloud/totp

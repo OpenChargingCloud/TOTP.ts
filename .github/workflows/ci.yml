@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  # Manual runs from the Actions tab ("Run workflow"), same as nightly.yml.
+  workflow_dispatch:
+
+concurrency:
+  # Pull requests: one run per branch, newest wins — a run against a head
+  # that has been superseded is answering a question nobody is asking any
+  # more.
+  #
+  # Pushes: one run per commit, and nothing cancels anything. A commit with
+  # no verdict is a hole nobody comes back to fill: the next commit contains
+  # it, so the code does get tested eventually, but once that run is red
+  # there is no longer any way to say which of the two commits did it.
+  #
+  # Keying the group on the SHA, rather than only turning cancel-in-progress
+  # off, is what makes that hold for more than two pushes: a group keeps at
+  # most one run *pending*, so a third push discards the second before it
+  # ever starts.
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build-and-test:
+    # Two operating systems × three Node.js release lines:
+    #
+    #  * Ubuntu, because that is where this library runs in production.
+    #  * Windows, because that is where it is developed — path separators and
+    #    line endings in the TypeScript toolchain differ enough to be worth
+    #    a leg of their own.
+    #  * Node 20, 22 and 24 are every release line vitest 4 can host (its
+    #    engines range is ^20 || ^22 || >=24). Node 20 is end-of-life since
+    #    April 2026 but stays in the matrix as long as this package's own
+    #    "engines" field still admits it. Node 18 cannot run the test runner
+    #    at all any more — the node18-smoke job below covers that claim.
+    #
+    # fail-fast is off on purpose: "red on exactly one leg" is the most
+    # valuable signal this matrix produces, so one leg must not cancel the
+    # others.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: ['20.x', '22.x', '24.x']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # "npm test" runs the TypeScript build first (tsconfig has noEmitOnError)
+      # and then the vitest suite, so a compile error and a failing test both
+      # surface in this one step. Note what the suite exercises: the sources
+      # under src/, transformed by vitest — not the compiled dist/. The build
+      # proves dist/ compiles; the smoke job below proves it runs.
+      - name: Build and test
+        run: npm test
+
+  # package.json claims "engines": { "node": ">=18" }, but vitest 4 dropped
+  # Node 18, so the matrix above can no longer verify that claim. This job
+  # does: build once on a current Node, then switch to Node 18 and check the
+  # compiled output against a known test vector — the same one the vitest
+  # suite pins. The compiled dist/ has zero runtime dependencies, so nothing
+  # else needs to be installed on the Node 18 side. When this leg goes red,
+  # either restore Node 18 compatibility or raise "engines" — silently
+  # shipping a package that no longer runs where it says it does is the one
+  # outcome this job exists to prevent.
+  node18-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.x'
+          cache: npm
+
+      - name: Install dependencies and build
+        run: npm ci && npm run build
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '18.x'
+
+      - name: Run compiled output on Node 18
+        run: |
+          node --version
+          node test/smoke.mjs
