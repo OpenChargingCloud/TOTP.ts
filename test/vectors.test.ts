@@ -42,7 +42,8 @@ const CAPABILITIES: ReadonlySet<string> = new Set([]);
  *  requiring anything else means the files are newer than this suite - fail,
  *  never skip silently. */
 const KNOWN_CAPABILITIES: ReadonlySet<string> = new Set([
-    "tlsChannelBinding"
+    "tlsChannelBinding",
+    "httpAuthentication"
 ]);
 
 
@@ -77,14 +78,19 @@ interface InvalidInputVector {
 }
 
 
-function load<T>(fileName: string): T[] {
-    return (JSON.parse(
+function load<T>(fileName: string): { requires?: string[]; vectors: T[] } {
+    return JSON.parse(
         readFileSync(new URL(`./vectors/${fileName}`, import.meta.url), "utf-8")
-    ) as { vectors: T[] }).vectors;
+    ) as { requires?: string[]; vectors: T[] };
 }
 
-const generationVectors   = load<GenerationVector>  ("totp-test-vectors.json");
-const invalidInputVectors = load<InvalidInputVector>("totp-invalid-inputs.json");
+const generationVectors    = load<GenerationVector>  ("totp-test-vectors.json").vectors;
+const invalidInputVectors  = load<InvalidInputVector>("totp-invalid-inputs.json").vectors;
+
+// The HTTP authentication vectors (spec/totp-http-authentication.md) are
+// capability-gated as a whole file: this library implements no HTTP binding,
+// so only the gate is checked and the file is skipped DECLARATIVELY below.
+const httpAuthFileRequires = load<unknown>          ("totp-http-auth-vectors.json").requires ?? [];
 
 
 function positional(input: VectorInput) {
@@ -118,11 +124,16 @@ describe("Vector files", () => {
     });
 
     it("require only capabilities this suite knows about", () => {
-        const unknown = generationVectors
-            .flatMap(vector => vector.requires ?? [])
+        const unknown = [ ...generationVectors.flatMap(vector => vector.requires ?? []),
+                          ...httpAuthFileRequires ]
             .filter(capability => !KNOWN_CAPABILITIES.has(capability));
         expect(unknown).toEqual([]);
     });
+
+    const missingHttp = httpAuthFileRequires.filter(capability => !CAPABILITIES.has(capability));
+
+    if (missingHttp.length > 0)
+        it.skip(`totp-http-auth-vectors.json (requires: ${missingHttp.join(", ")})`, () => {});
 
 });
 
