@@ -50,6 +50,19 @@ function calcTOTPSlot(slotBytes:      Buffer,
     const currentHash = hmac.update(slotBytes).digest();
     const offset = currentHash[currentHash.length - 1] & 0x0F;
 
+    // Two properties of this loop are frozen parts of the token format — the
+    // C# TOTPGenerator in Vanaheimr Hermod produces byte-identical tokens and
+    // deployed verifiers depend on them (see README, "Security notes"):
+    //
+    //  * "% alphabet.length" has a modulo bias: with the default 62-character
+    //    alphabet, 256 = 4*62 + 8, so the first eight alphabet characters are
+    //    25% more likely than the rest. Do not "fix" this with rejection
+    //    sampling — alphabets whose length divides 256 (e.g. the 64-character
+    //    base64url set) have no bias at all.
+    //
+    //  * "% currentHash.length" reads the hash as a ring buffer: position
+    //    i + hashLength repeats position i verbatim, so tokens longer than
+    //    32/48/64 characters (sha256/sha384/sha512) gain no further entropy.
     let result = "";
     for (let i = 0; i < totpLength; i++)
         result += alphabet[currentHash[(offset + i) % currentHash.length] % alphabet.length];
@@ -146,7 +159,10 @@ export function generateTOTPs(sharedSecretOrOptions:  string | GenerateTOTPOptio
     const currentSlotBytes   = Buffer.alloc(8);
     const nextSlotBytes      = Buffer.alloc(8);
 
-    previousSlotBytes.writeBigUInt64BE(currentSlot - BigInt(1));
+    // BigInt.asUintN mirrors the unchecked UInt64 arithmetic of the C#
+    // implementation: within the first slot after the Unix epoch, "previous"
+    // wraps to slot 2^64 - 1 instead of throwing on -1n.
+    previousSlotBytes.writeBigUInt64BE(BigInt.asUintN(64, currentSlot - BigInt(1)));
     currentSlotBytes. writeBigUInt64BE(currentSlot);
     nextSlotBytes.    writeBigUInt64BE(currentSlot + BigInt(1));
 

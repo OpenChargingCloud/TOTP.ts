@@ -68,6 +68,71 @@ Returns:
 }
 ```
 
+## Security notes
+
+The token format is shared with the C# `TOTPGenerator` in
+[Vanaheimr Hermod](https://github.com/Vanaheimr/Hermod), which produces
+byte-identical tokens for the same secret, time slot and alphabet (Hermod is
+HMAC-SHA256 only so far; `sha384` and `sha512` are extensions of this
+library). The format is therefore frozen: neither of the two quirks below can
+be "fixed" here without breaking every deployed verifier. So they are
+documented instead — with numbers, because the numbers are the interesting
+part.
+
+### Modulo bias
+
+Each token character is chosen as `hashByte % alphabet.length`. Whenever the
+alphabet length does not divide 256, the first `256 % length` characters of
+the alphabet are reachable from one extra byte value: with the default
+62-character alphabet, `256 = 4·62 + 8`, so its first eight characters
+(`0`–`7`) each appear with probability 5/256 ≈ 1.953 %, the remaining 54 with
+4/256 ≈ 1.563 % — a relative excess of 25 %, easily visible in a frequency
+count over a few thousand tokens.
+
+Per character this costs almost nothing in Shannon entropy (5.9497 bits
+instead of log₂ 62 ≈ 5.9542), and noticeably more in min-entropy, the measure
+a guessing attacker cares about: −log₂(5/256) ≈ 5.678 bits. A default
+12-character token therefore carries ≈ 71.40 bits of Shannon entropy and
+≈ 68.14 bits of min-entropy instead of the ideal 71.45 — the single most
+likely token is about ten times more probable than under a perfectly uniform
+draw, at (5/256)¹² ≈ 3.1·10⁻²¹, inside a 30-second validity window. For
+calibration: a six-digit RFC 6238 code carries 19.93 bits, and RFC 4226's
+dynamic truncation has a modulo bias of its own (2³¹ mod 10⁶ = 483 648, a
+0.047 % excess for the residues below it). Ours is larger only because 256
+and 62 are the same order of magnitude, while 2³¹ dwarfs 10⁶.
+
+Choosing an alphabet whose length divides 256 removes the bias entirely, no
+code change required: appending `-` and `_` to the default alphabet yields
+the 64-character base64url character set, and `256 = 4·64` exactly. A
+digits-only alphabet (`"0123456789"`) leans the other way: `256 = 25·10 + 6`,
+so `0`–`5` are 4 % more likely than `6`–`9`.
+
+### Token length vs. hash length
+
+Characters are read from the HMAC output at index `(offset + i) % hashLength`
+— the hash is a ring buffer. Position `i + hashLength` therefore always
+repeats position `i`, and a token longer than the hash simply starts over:
+
+```js
+generateTOTPs("secure!Charging!", 30, 64, null, 1718611200000).current
+// "akF3c7qY2uiuO4rpyU0SC0W8VFE6nvxz" + "akF3c7qY2uiuO4rpyU0SC0W8VFE6nvxz"
+//  — the 32-character sha256 token, twice.
+```
+
+Entropy stops growing at `hashLength` characters:
+
+| `hashAlgorithm` | Hash bytes | Longest useful token | Min-entropy at that length (default alphabet) |
+| --- | --- | --- | --- |
+| `sha256` | 32 | 32 characters | ≈ 181.7 bits |
+| `sha384` | 48 | 48 characters | ≈ 272.5 bits |
+| `sha512` | 64 | 64 characters | ≈ 363.4 bits |
+
+`totpLength` still accepts up to 255 — the bound is part of the shared format
+contract, and the C# implementation cycles identically — but characters
+beyond the hash length add no security, and the visible period incidentally
+reveals which hash algorithm produced the token. If you need a longer token,
+pick a longer hash, not a longer `totpLength`.
+
 ## Development
 
 ```sh

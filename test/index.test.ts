@@ -103,6 +103,30 @@ describe("Generate TOTPs", () => {
 });
 
 
+describe("Token format properties", () => {
+
+  it("reads the hash as a ring buffer: a 64 character sha256 token repeats its first 32 characters verbatim", () => {
+    expect(generateTOTPs("secure!Charging!", 30, 64, null, 1718611200000, "sha256").current)
+      .toBe("akF3c7qY2uiuO4rpyU0SC0W8VFE6nvxz".repeat(2));
+  });
+
+  it("does not repeat a 64 character sha512 token, as its hash has 64 bytes", () => {
+    const totp = generateTOTPs("secure!Charging!", 30, 64, null, 1718611200000, "sha512").current;
+    expect(totp.slice(32)).not.toBe(totp.slice(0, 32));
+  });
+
+  it("wraps the previous slot to 2^64 - 1 within the first slot after the Unix epoch, like the unchecked UInt64 arithmetic in C#", () => {
+    expect(generateTOTPs("secure!Charging!", 30, 12, null, 0)).toEqual({
+      previous:       "SzcwtcR5qcY7",
+      current:        "u5CoKdo5HUS1",
+      next:           "tVGiyLys7Y1V",
+      remainingTime:   30
+    });
+  });
+
+});
+
+
 describe("Object API", () => {
 
   it("supports the options object API", () => {
