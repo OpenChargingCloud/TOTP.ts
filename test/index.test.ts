@@ -1,107 +1,13 @@
+// The example token values and rejection cases that used to be duplicated
+// here live in the canonical conformance vectors now (test/vectors/, run by
+// vectors.test.ts and shared with the C# TOTPGenerator in Vanaheimr Hermod
+// via https://github.com/OpenChargingCloud/TOTPConformanceTests). This file
+// keeps the structural properties of the frozen token format that hold for
+// ALL inputs, beyond the pinned example values.
+
 import { describe, expect, it } from "vitest";
 
 import { generateTOTPs } from "../src/index.js";
-
-describe("Validations", () => {
-
-  it("throws an error for empty shared secret", () => {
-    expect(() => generateTOTPs("")).toThrow("The given shared secret must not be null or empty!");
-  });
-
-  it("throws an error for short shared secret", () => {
-    expect(() => generateTOTPs("shortSecret")).toThrow("The length of the given shared secret must be at least 16 characters!");
-  });
-
-  it("throws an error for invalid TOTP length", () => {
-    expect(() => generateTOTPs("secure!Charging!", 30, 3)).toThrow("The expected length of the TOTP must be between 4 and 255 characters!");
-  });
-
-  it("throws an error for invalid alphabet", () => {
-    expect(() => generateTOTPs("secure!Charging!", 30, 12, "abc")).toThrow("The given alphabet must contain at least 4 characters!");
-  });
-
-  it("throws an error for duplicate characters in alphabet", () => {
-    expect(() => generateTOTPs("secure!Charging!", 30, 12, "abcdeff")).toThrow("The given alphabet must not contain duplicate characters!");
-  });
-
-  it("throws an error for whitespace characters in alphabet", () => {
-    expect(() => generateTOTPs("secure!Charging!", 30, 12, "ab cdef")).toThrow("The given alphabet must not contain any whitespace characters!");
-  });
-
-  it("throws an error for invalid hash algorithm", () => {
-    expect(() => generateTOTPs("secure!Charging!", 30, 12, null, null, "sha1" as never)).toThrow("The hash algorithm must be one of: sha256, sha384, sha512!");
-  });
-
-});
-
-
-describe("Generate TOTPs", () => {
-
-  it("generates deterministic TOTPs for a fixed timestamp", () => {
-    expect(generateTOTPs("secure!Charging!", 30, 12, null, 1718611200000)).toEqual({
-      previous:       "QT1cCdKsIb9e",
-      current:        "akF3c7qY2uiu",
-      next:           "1U70OgaBA48M",
-      remainingTime:   30
-    });
-  });
-
-  it("generates TOTP codes for the given timestamp correctly", () => {
-    expect(generateTOTPs("secure!Charging!", null, null, null, Date.UTC(2024, 4, 23, 0, 23, 5))).toEqual({
-      previous:       "MdPU0jCm5tXz",
-      current:        "CN63y502maVh",
-      next:           "dI54vnA25m2h",
-      remainingTime:   25
-    });
-  });
-
-  it("generates TOTP codes with the given length correctly", () => {
-    expect(generateTOTPs("secure!Charging!", null, 23, null, Date.UTC(2024, 4, 23, 0, 23, 5))).toEqual({
-      previous:       "MdPU0jCm5tXzkaPrPj61KwI",
-      current:        "CN63y502maVhAsv27Sd7JlE",
-      next:           "dI54vnA25m2hWW3bUcdY13q",
-      remainingTime:   25
-    });
-  });
-
-  it("generates TOTP codes with the given alphabet correctly", () => {
-    expect(generateTOTPs("secure!Charging!", null, null, "0123456789", Date.UTC(2024, 4, 23, 0, 23, 5))).toEqual({
-      previous:       "233045043555",
-      current:        "894361286613",
-      next:           "545817627227",
-      remainingTime:   25
-    });
-  });
-
-  it("generates TOTP codes with the given validity time correctly", () => {
-    expect(generateTOTPs("secure!Charging!", 60, null, null, Date.UTC(2024, 4, 23, 0, 23, 5))).toEqual({
-      previous:       "nTdkiuG6yUyg",
-      current:        "XJZr0L1DGKn0",
-      next:           "ft0ONZ62MdMj",
-      remainingTime:   55
-    });
-  });
-
-  it("generates TOTP codes with SHA-384 correctly", () => {
-    expect(generateTOTPs("secure!Charging!", null, null, null, Date.UTC(2024, 4, 23, 0, 23, 5), "sha384")).toEqual({
-      previous:       "0SbZV69lSa4W",
-      current:        "jAzmwLzuPuUb",
-      next:           "mqtkOMRrX1aS",
-      remainingTime:   25
-    });
-  });
-
-  it("generates TOTP codes with SHA-512 correctly", () => {
-    expect(generateTOTPs("secure!Charging!", null, null, null, Date.UTC(2024, 4, 23, 0, 23, 5), "sha512")).toEqual({
-      previous:       "wjmTW4LVTdwv",
-      current:        "yBhTTbXO2ILd",
-      next:           "MHMqTXE1oVf9",
-      remainingTime:   25
-    });
-  });
-
-});
-
 
 describe("Token format properties", () => {
 
@@ -124,22 +30,18 @@ describe("Token format properties", () => {
     });
   });
 
-});
+  it("defaults to HMAC-SHA256", () => {
+    expect(generateTOTPs("secure!Charging!", null, null, null, 1718611200000).current)
+      .toBe(generateTOTPs("secure!Charging!", null, null, null, 1718611200000, "sha256").current);
+  });
 
-
-describe("Object API", () => {
-
-  it("supports the options object API", () => {
-    expect(
-      generateTOTPs({
-        sharedSecret:  "secure!Charging!",
-        validityTime:   30,
-        totpLength:     6,
-        alphabet:      "0123456789",
-        timestamp:      new Date(1718611200000),
-        hashAlgorithm: "sha256"
-      }).current
-    ).toBe("441749");
+  it("overlaps previous/current/next across adjacent slots", () => {
+    const timestamp = 1718611200000;
+    const next0     = generateTOTPs("secure!Charging!", null, null, null, timestamp).next;
+    const current1  = generateTOTPs("secure!Charging!", null, null, null, timestamp + 30_000).current;
+    const previous2 = generateTOTPs("secure!Charging!", null, null, null, timestamp + 60_000).previous;
+    expect(current1).toBe(next0);
+    expect(previous2).toBe(next0);
   });
 
 });
