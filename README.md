@@ -72,12 +72,11 @@ Returns:
 
 The token format is shared with the C# `TOTPGenerator` in
 [Vanaheimr Hermod](https://github.com/Vanaheimr/Hermod), which produces
-byte-identical tokens for the same secret, time slot and alphabet (Hermod is
-HMAC-SHA256 only so far; `sha384` and `sha512` are extensions of this
-library). The format is therefore frozen: neither of the two quirks below can
-be "fixed" here without breaking every deployed verifier. So they are
-documented instead — with numbers, because the numbers are the interesting
-part.
+byte-identical tokens for the same secret, time slot and alphabet — for all
+three hash algorithms, and both sides default to HMAC-SHA256. The format is
+therefore frozen: neither of the two quirks below can be "fixed" here
+without breaking every deployed verifier. So they are documented instead —
+with numbers, because the numbers are the interesting part.
 
 ### Modulo bias
 
