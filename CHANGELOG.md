@@ -12,6 +12,17 @@ moved a single token would break deployed verifiers and printed QR codes, so no
 entry below ever will.
 
 
+## [0.3.1] - 2026-09-05
+
+### Changed
+
+- The repository URLs name `TOTP.TS`, the spelling the repository actually
+  has. Metadata only - no code, no token value and no API changed. It needs a
+  release of its own because npm serves `repository`, `homepage` and the README
+  from the published version and lets no version be edited afterwards, so 0.3.0
+  will keep pointing at the old spelling forever.
+
+
 ## [0.3.0] - 2026-09-05
 
 ### Breaking
