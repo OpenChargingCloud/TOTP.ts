@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (c) 2024-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
  * This file is part of TOTP.ts <https://github.com/OpenChargingCloud/TOTP.ts>
  *
@@ -15,7 +15,23 @@
  * limitations under the License.
  */
 
-import crypto from "node:crypto";
+import { hmac }                   from "@noble/hashes/hmac.js";
+import { sha256, sha384, sha512 } from "@noble/hashes/sha2.js";
+
+// The hash functions by the name the API takes. @noble/hashes rather than
+// Node's crypto: this library has to run wherever a one-time password is
+// needed - Node, a browser, a bundler's output, a service worker - and
+// "node:crypto" is unavailable in three of those four. It is also what keeps
+// the API synchronous: WebCrypto could do the HMAC in a browser, but only
+// asynchronously, which would turn generateTOTPs() into a promise for every
+// caller that ever existed.
+const hashFunctions: Record<TOTPHashAlgorithm, Parameters<typeof hmac.create>[0]> = {
+    "sha256": sha256,
+    "sha384": sha384,
+    "sha512": sha512
+};
+
+const utf8 = new TextEncoder();
 
 const DEFAULT_VALIDITY_TIME  = 30;
 const DEFAULT_TOTP_LENGTH    = 12;
@@ -40,14 +56,13 @@ export interface TOTPResult {
     remainingTime:  number;
 }
 
-function calcTOTPSlot(slotBytes:      Buffer,
+function calcTOTPSlot(slotBytes:      Uint8Array,
                       totpLength:     number,
                       alphabet:       string,
                       sharedSecret:   string,
                       hashAlgorithm:  TOTPHashAlgorithm): string {
 
-    const hmac = crypto.createHmac(hashAlgorithm, Buffer.from(sharedSecret, "utf-8"));
-    const currentHash = hmac.update(slotBytes).digest();
+    const currentHash = hmac(hashFunctions[hashAlgorithm], utf8.encode(sharedSecret), slotBytes);
     const offset = currentHash[currentHash.length - 1] & 0x0F;
 
     // Two properties of this loop are frozen parts of the token format — the
@@ -68,6 +83,19 @@ function calcTOTPSlot(slotBytes:      Buffer,
         result += alphabet[currentHash[(offset + i) % currentHash.length] % alphabet.length];
 
     return result;
+
+}
+
+// The slot number as the eight big-endian bytes the HMAC is taken over -
+// Buffer.alloc(8).writeBigUInt64BE() without Buffer, which exists in Node
+// alone. DataView is the same eight bytes, everywhere.
+function slotBytesOf(slot: bigint): Uint8Array {
+
+    const bytes = new Uint8Array(8);
+
+    new DataView(bytes.buffer).setBigUint64(0, slot, false);
+
+    return bytes;
 
 }
 
@@ -115,6 +143,11 @@ export function generateTOTPs(sharedSecretOrOptions:  string | GenerateTOTPOptio
     const normalizedTimestamp     =  normalizeTimestamp(options.timestamp);
     const normalizedHashAlgorithm =  options.hashAlgorithm ?? DEFAULT_HASH_ALGORITHM;
 
+    // The type says string; a JavaScript caller says whatever it likes, and the
+    // invalid-input vectors expect this function's own error message rather
+    // than a TypeError from .trim(). The optional chain is what keeps that
+    // promise, so the rule is answered here rather than obeyed.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     const sharedSecret            =  options.sharedSecret?.trim();
     const normalizedAlphabet      = (options.alphabet     ?? DEFAULT_ALPHABET).trim();
 
@@ -155,16 +188,12 @@ export function generateTOTPs(sharedSecretOrOptions:  string | GenerateTOTPOptio
     const currentSlot        = BigInt(Math.floor(currentUnixTime / normalizedValidityTime));
     const remainingTime      = normalizedValidityTime - (currentUnixTime % normalizedValidityTime);
 
-    const previousSlotBytes  = Buffer.alloc(8);
-    const currentSlotBytes   = Buffer.alloc(8);
-    const nextSlotBytes      = Buffer.alloc(8);
-
     // BigInt.asUintN mirrors the unchecked UInt64 arithmetic of the C#
     // implementation: within the first slot after the Unix epoch, "previous"
     // wraps to slot 2^64 - 1 instead of throwing on -1n.
-    previousSlotBytes.writeBigUInt64BE(BigInt.asUintN(64, currentSlot - BigInt(1)));
-    currentSlotBytes. writeBigUInt64BE(currentSlot);
-    nextSlotBytes.    writeBigUInt64BE(currentSlot + BigInt(1));
+    const previousSlotBytes  = slotBytesOf(BigInt.asUintN(64, currentSlot - BigInt(1)));
+    const currentSlotBytes   = slotBytesOf(currentSlot);
+    const nextSlotBytes      = slotBytesOf(currentSlot + BigInt(1));
 
     return {
         previous:  calcTOTPSlot(previousSlotBytes, normalizedTOTPLength, normalizedAlphabet, sharedSecret, normalizedHashAlgorithm),

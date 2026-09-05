@@ -1,6 +1,6 @@
 {
   "name": "@open-charging-cloud/totp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Time-based one-time password generator for Open Charging Cloud applications.",
   "repository": {
     "type": "git",
@@ -17,36 +17,52 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    }
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix --max-warnings=0",
     "test": "npm run build && vitest run",
+    "verify": "npm run typecheck && npm run lint && npm test",
     "prepack": "npm run test"
   },
   "keywords": [
     "totp",
     "otp",
     "time-based-one-time-password",
+    "browser",
+    "isomorphic",
     "open-charging-cloud"
   ],
   "author": "GraphDefined GmbH <achim.friedland@graphdefined.com>",
   "license": "Apache-2.0",
   "engines": {
-    "node": ">=18"
+    "node": ">=20.19.0"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
-    "typescript": "^5.8.0",
-    "vitest": "^4.1.9"
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.4.1",
+    "eslint": "^10.10.0",
+    "globals": "^17.12.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.69.0",
+    "vitest": "^5.0.0"
   },
   "publishConfig": {
     "access": "public"
+  },
+  "dependencies": {
+    "@noble/hashes": "^2.4.0"
   }
 }

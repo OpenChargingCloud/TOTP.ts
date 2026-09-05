@@ -30,6 +30,19 @@ It can be used e.g. for Secure Dynamic QR-Codes in E-Mobility or a secure altern
 npm install @open-charging-cloud/totp
 ```
 
+## Where it runs
+
+Everywhere a one-time password is needed: Node, browsers, bundler output
+(webpack, Vite, esbuild, Rollup), Cordova, Deno, service workers. The library
+uses nothing that only Node has — no `node:crypto`, no `Buffer` — so a bundler
+needs no alias, no fallback and no polyfill for it, and `test/portability.test.ts`
+keeps it that way.
+
+The HMAC comes from [`@noble/hashes`](https://github.com/paulmillr/noble-hashes),
+the library's only runtime dependency. It is what keeps the API **synchronous**:
+WebCrypto could compute the same digest in a browser, but only asynchronously,
+which would turn `generateTOTPs()` into a promise for every caller.
+
 ## Usage
 
 ```js

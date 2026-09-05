@@ -4,9 +4,8 @@
     "declarationMap": true,
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "noEmit": true,
     "noEmitOnError": true,
-    "outDir": "dist",
-    "rootDir": "src",
     "strict": true,
     "target": "ES2022",
     "types": [
@@ -14,6 +13,12 @@
     ]
   },
   "include": [
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "*.config.ts"
+  ],
+  "exclude": [
+    "dist",
+    "node_modules"
   ]
 }

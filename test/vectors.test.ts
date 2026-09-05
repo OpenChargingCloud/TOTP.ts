@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (c) 2024-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
  * This file is part of TOTP.ts <https://github.com/OpenChargingCloud/TOTP.ts>
  *
@@ -32,7 +32,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { generateTOTPs, type TOTPHashAlgorithm } from "../src/index.js";
+import { generateTOTPs, type TOTPHashAlgorithm, type TOTPResult } from "../src/index.js";
 
 
 const IMPLEMENTATION_NAME = "totp.ts";
@@ -80,10 +80,15 @@ interface InvalidInputVector {
 }
 
 
-function load<T>(fileName: string): { requires?: string[]; vectors: T[] } {
+interface VectorFile<T> {
+    requires?:  string[];
+    vectors:    T[];
+}
+
+function load<T>(fileName: string): VectorFile<T> {
     return JSON.parse(
         readFileSync(new URL(`./vectors/${fileName}`, import.meta.url), "utf-8")
-    ) as { requires?: string[]; vectors: T[] };
+    ) as VectorFile<T>;
 }
 
 const generationVectors    = load<GenerationVector>  ("totp-test-vectors.json").vectors;
@@ -96,7 +101,7 @@ const invalidInputVectors  = load<InvalidInputVector>("totp-invalid-inputs.json"
 const httpAuthFileRequires = load<unknown>          ("totp-http-auth-vectors.json").requires ?? [];
 
 
-function positional(input: VectorInput) {
+function positional(input: VectorInput): TOTPResult {
     return generateTOTPs(
         input.sharedSecret,
         input.validityTimeSeconds ?? null,
@@ -107,7 +112,7 @@ function positional(input: VectorInput) {
     );
 }
 
-function viaOptions(input: VectorInput) {
+function viaOptions(input: VectorInput): TOTPResult {
     return generateTOTPs({
         sharedSecret:   input.sharedSecret,
         validityTime:   input.validityTimeSeconds ?? null,
@@ -172,12 +177,12 @@ describe("Invalid input vectors", () => {
 
     for (const vector of invalidInputVectors) {
 
-        if (vector.notApplicable?.includes(IMPLEMENTATION_NAME)) {
+        if (vector.notApplicable?.includes(IMPLEMENTATION_NAME) === true) {
             it.skip(`${vector.id} (not representable in this API)`, () => {});
             continue;
         }
 
-        if (vector.knownDeviations?.includes(IMPLEMENTATION_NAME)) {
+        if (vector.knownDeviations?.includes(IMPLEMENTATION_NAME) === true) {
             it.skip(`${vector.id} (documented deviation, see the conformance repository)`, () => {});
             continue;
         }
